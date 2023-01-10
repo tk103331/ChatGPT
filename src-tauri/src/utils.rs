@@ -1,7 +1,9 @@
+use crate::conf::ChatConfJson;
 use anyhow::Result;
 use log::info;
 use regex::Regex;
 use serde_json::Value;
+use std::io::{BufRead, BufReader, Write};
 use std::{
     collections::HashMap,
     fs::{self, File},
@@ -10,6 +12,11 @@ use std::{
 };
 use tauri::updater::UpdateResponse;
 use tauri::{utils::config::Config, AppHandle, Manager, Wry};
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub enum ProcessMessage {
+    ProcessArgs(Vec<String>),
+}
 
 pub fn chat_root() -> PathBuf {
     tauri::api::path::home_dir().unwrap().join(".chatgpt")
@@ -227,6 +234,53 @@ pub async fn silent_install(app: AppHandle<Wry>, update: UpdateResponse<Wry>) ->
     if should_exit {
         app.restart();
     }
+
+    Ok(())
+}
+
+pub fn try_open_in_existing_process(args: Vec<String>) -> Result<()> {
+    let local_socket = ChatConfJson::local_socket();
+    let mut socket = interprocess::local_socket::LocalSocketStream::connect(local_socket)?;
+    let msg = ProcessMessage::ProcessArgs(args);
+    let data = serde_json::to_string(&msg).unwrap();
+    socket.write_all(data.as_bytes())?;
+    socket.write_all("\n".as_bytes())?;
+    socket.flush()?;
+    Ok(())
+}
+
+pub fn listen_local_socket(app: &AppHandle<Wry>) -> Result<()> {
+    let app = app.clone();
+    let local_socket = ChatConfJson::local_socket();
+    let _ = std::fs::remove_file(&local_socket);
+    let socket = interprocess::local_socket::LocalSocketListener::bind(local_socket)?;
+    tauri::async_runtime::spawn(async move {
+        for stream in socket.incoming().flatten() {
+            let mut reader = BufReader::new(stream);
+            loop {
+                let mut buf = String::new();
+                let _s = reader.read_line(&mut buf);
+                if let Ok(msg) = serde_json::from_str(&buf) {
+                    match msg {
+                        ProcessMessage::ProcessArgs(args) => {
+                            if !args.is_empty() && !args[0].is_empty() {
+                                let win = app.get_window("core").unwrap();
+                                win.show().unwrap();
+                                win.set_focus().unwrap();
+                                win.eval(
+                                    format!("window.processExternalInput(\"{}\")", args[0])
+                                        .as_str(),
+                                )
+                                .unwrap();
+                            }
+                        }
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+    });
 
     Ok(())
 }

@@ -9,6 +9,7 @@ mod utils;
 
 use app::{cmd, fs_extra, menu, setup};
 use conf::ChatConfJson;
+use std::env;
 use tauri::api::path;
 use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_log::{
@@ -29,6 +30,13 @@ async fn main() {
         info: Color::BrightGreen,
         trace: Color::Cyan,
     };
+
+    let args: Vec<String> = env::args().collect();
+    let result = utils::try_open_in_existing_process(args[1..].to_vec());
+    if result.is_ok() {
+        println!("try_open_in_existing_process success, exit");
+        return;
+    }
 
     tauri::Builder::default()
         // https://github.com/tauri-apps/tauri/pull/2736

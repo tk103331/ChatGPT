@@ -99,6 +99,10 @@ impl ChatConfJson {
         chat_root().join("chat.conf.json")
     }
 
+    pub fn local_socket() -> PathBuf {
+        chat_root().join("local.sock")
+    }
+
     pub fn get_chat_conf() -> Self {
         let conf_file = ChatConfJson::conf_path();
         let file_content = fs::read_to_string(&conf_file).unwrap();

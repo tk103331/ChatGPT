@@ -10,8 +10,10 @@ pub fn init(app: &mut App) -> std::result::Result<(), Box<dyn std::error::Error>
     let theme = ChatConfJson::theme();
     let handle = app.app_handle();
 
+    utils::listen_local_socket(&handle).unwrap();
+
     tauri::async_runtime::spawn(async move {
-        window::tray_window(&handle);
+        window::tray_window(&handle.clone());
     });
 
     if let Some(v) = chat_conf.global_shortcut {

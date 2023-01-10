@@ -39,6 +39,19 @@ async function invoke(cmd, args) {
 window.uid = uid;
 window.invoke = invoke;
 window.transformCallback = transformCallback;
+window.processExternalInput = (input) => {
+    if (input) {
+        const form = document.querySelector("form");
+        if (form) {
+            const textarea = form.querySelector("textarea");
+            const button = form.querySelector("button.absolute.rounded-md");
+            if (textarea && button) {
+                textarea.value = input;
+                button.click();
+            }
+        }
+    }
+}
 
 async function init() {
   if (__TAURI_METADATA__.__currentWindow.label === 'tray') {
